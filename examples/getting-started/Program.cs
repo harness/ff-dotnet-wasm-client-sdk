@@ -7,7 +7,6 @@ using ff_dotnet_wasm_client_sdk.client.dto;
 using Serilog;
 using Serilog.Extensions.Logging;
 
-
 var apiKey = Environment.GetEnvironmentVariable("FF_API_KEY");
 var flagName = Environment.GetEnvironmentVariable("FF_FLAG_NAME") ?? "harnessappdemodarkmode";
 
