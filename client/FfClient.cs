@@ -10,6 +10,7 @@ using io.harness.ff_dotnet_client_sdk.openapi.Api;
 using io.harness.ff_dotnet_client_sdk.openapi.Client;
 using io.harness.ff_dotnet_client_sdk.openapi.Model;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 
 namespace ff_dotnet_wasm_client_sdk.client;
@@ -47,8 +48,7 @@ public class FfClient : IDisposable
         _target = target;
         _pollTimer = new System.Timers.Timer();
         _pollTimer.Elapsed += Poll;
-        var i = TimeSpan.FromSeconds(config.MetricsIntervalInSeconds).TotalMilliseconds;
-        _pollTimer.Interval = i;
+        _pollTimer.Interval = TimeSpan.FromSeconds(config.MetricsIntervalInSeconds).TotalMilliseconds;
         _pollTimer.AutoReset = true;
     }
 
@@ -59,7 +59,7 @@ public class FfClient : IDisposable
 
         if (_config.AnalyticsEnabled)
         {
-            _metricsTimer = new MetricsTimer(_config);
+            _metricsTimer = new MetricsTimer(_target, _config, _config.LoggerFactory, _authInfo);
         }
 
         await PollOnce();
@@ -85,13 +85,6 @@ public class FfClient : IDisposable
         var org = jwtToken.Payload.TryGetValue("organization", out value) ? value.ToString() : "";
         var projectId = jwtToken.Payload.TryGetValue("projectIdentifier", out value) ? value.ToString() : "";
 
-        _api.Configuration.DefaultHeaders.Clear();
-        _api.Configuration.DefaultHeaders.Add("Authorization", "Bearer " + authResp.AuthToken);
-        _api.Configuration.DefaultHeaders.Add("Harness-EnvironmentID", environmentIdentifier);
-        _api.Configuration.DefaultHeaders.Add("Harness-AccountID", accountId);
-        _api.Configuration.DefaultHeaders.Add("User-Agent", UserAgentHeader);
-        _api.Configuration.DefaultHeaders.Add("Harness-SDK-Info", HarnessSdkInfoHeader);
-
         var authInfo = new AuthInfo
         {
             Project = project,
@@ -104,6 +97,10 @@ public class FfClient : IDisposable
             BearerToken = authResp.AuthToken,
             ApiKey = apiKey
         };
+
+        _api.Configuration.DefaultHeaders.Clear();
+        AddSdkHeaders(_api.Configuration.DefaultHeaders, authInfo);
+
 
         return authInfo;
     }
@@ -284,6 +281,11 @@ public class FfClient : IDisposable
 
     private void RegisterEvaluation(string evaluationId, Evaluation evaluation)
     {
+        if (_config?.AnalyticsEnabled ?? false)
+        {
+            Variation variation = new Variation(evaluation.Identifier, evaluation.Value, evaluationId);
+            _metricsTimer?.RegisterEvaluation(evaluationId, variation);
+        }
     }
 
     public void Dispose()
@@ -312,5 +314,20 @@ public class FfClient : IDisposable
         return new ClientApi(httpClient, _config.ConfigUrl, httpClientHandler);
     }
 
+    internal static void AddSdkHeaders(IDictionary<string, string> headers, AuthInfo authInfo)
+    {
+        headers.Add("Authorization", "Bearer " + authInfo.BearerToken);
+        headers.Add("Harness-SDK-Info", HarnessSdkInfoHeader);
+        headers.Add("User-Agent", UserAgentHeader);
 
+        if (!authInfo.AccountId.IsNullOrEmpty())
+        {
+            headers.Add("Harness-AccountID", authInfo.AccountId);
+        }
+
+        if (!authInfo.EnvironmentIdentifier.IsNullOrEmpty())
+        {
+            headers.Add("Harness-EnvironmentID", authInfo.EnvironmentIdentifier);
+        }
+    }
 }

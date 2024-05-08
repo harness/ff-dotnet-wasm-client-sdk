@@ -111,4 +111,17 @@ public class ConfigBuilder
         _loggerFactory = factory;
         return this;
     }
+
+    public interface INetworkChecker
+    {
+        bool IsNetworkAvailable();
+    }
+
+    internal class NullNetworkChecker : INetworkChecker {
+        public bool IsNetworkAvailable()
+        {
+            return true;
+        }
+    }
+
 }
