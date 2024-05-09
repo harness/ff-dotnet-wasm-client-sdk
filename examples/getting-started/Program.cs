@@ -27,7 +27,7 @@ using var client = new FfClient(apiKey, config, target);
 await client.InitializeAsync();
 
 
-for (var i = 1; i < 1000; i++)
+for (var i = 1; i < 100; i++)
 {
     var value = await client.BoolVariationAsync(flagName, false);
     Console.Out.WriteLine("flag {0} = {1}", flagName, value);
