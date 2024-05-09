@@ -164,22 +164,6 @@ public class FfClient : IDisposable
         return Task.FromResult(XVariation(evaluationId, defaultValue, eval => bool.Parse(eval.Value)));
     }
 
-    public Task<string> StringVariationAsync(string evaluationId, string defaultValue)
-    {
-        return Task.FromResult(XVariation(evaluationId, defaultValue, eval => eval.Value));
-    }
-
-    public Task<double> NumberVariationAsync(string evaluationId, double defaultValue)
-    {
-        return Task.FromResult(XVariation(evaluationId, defaultValue, eval => double.Parse(eval.Value)));
-    }
-
-    public Task<JObject> JsonVariationAsync(string evaluationId, JObject defaultValue)
-    {
-        return Task.FromResult(XVariation<JObject>(evaluationId, defaultValue, eval => JObject.Parse(eval.Value)));
-    }
-
-
     private T XVariation<T>(string evaluationId, T defaultValue, Func<Evaluation, T> evalToPrimitive)
     {
         var defaultValueStr = defaultValue?.ToString() ?? "null";
