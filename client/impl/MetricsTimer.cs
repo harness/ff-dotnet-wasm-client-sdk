@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Timers;
 using ff_dotnet_wasm_client_sdk.client.dto;
-using io.harness.ff_dotnet_client_sdk.client.impl.dto;
+using ff_dotnet_wasm_client_sdk.client.impl.dto;
 using io.harness.ff_dotnet_client_sdk.openapi.Api;
 using io.harness.ff_dotnet_client_sdk.openapi.Client;
 using io.harness.ff_dotnet_client_sdk.openapi.Model;

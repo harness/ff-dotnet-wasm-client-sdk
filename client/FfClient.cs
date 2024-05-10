@@ -5,6 +5,7 @@ using System.Text;
 using System.Timers;
 using ff_dotnet_wasm_client_sdk.client.dto;
 using ff_dotnet_wasm_client_sdk.client.impl;
+using ff_dotnet_wasm_client_sdk.client.impl.dto;
 using io.harness.ff_dotnet_client_sdk.openapi.Api;
 using io.harness.ff_dotnet_client_sdk.openapi.Model;
 using Microsoft.Extensions.Logging;
@@ -21,16 +22,59 @@ public class FfClient : IDisposable
     internal const int DefaultTimeoutMs = 60_000;
 
     private readonly ILogger<FfClient> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly string _apiKey;
     private readonly FfConfig _config;
     private readonly FfTarget _target;
-    private readonly ConcurrentDictionary<string, CacheEntry> _cache1 = new();
     private readonly ConcurrentDictionary<string, Evaluation> _cache = new();
     private readonly System.Timers.Timer _pollTimer;
 
     private ClientApi? _api;
     private AuthInfo? _authInfo;
     private MetricsTimer? _metricsTimer;
+    private EventSource? _eventSource;
+    private bool _streamFailed;
+
+    private class StreamSourceListener : IEventSourceListener
+    {
+        private ILogger<StreamSourceListener> _logger;
+
+
+        internal StreamSourceListener(ILoggerFactory factory)
+        {
+            _logger = factory.CreateLogger<StreamSourceListener>();
+        }
+
+        public void SseStart()
+        {
+            _logger.LogInformation("SseStart");
+        }
+
+        public void SseEnd(string reason, Exception? cause)
+        {
+            _logger.LogInformation("SseEnd");
+        }
+
+        public void SseEvaluationChange(string identifier)
+        {
+            _logger.LogInformation("SseEvaluationChange");
+        }
+
+        public void SseEvaluationsUpdate(List<Evaluation> evaluations)
+        {
+            _logger.LogInformation("SseEvaluationsUpdate");
+        }
+
+        public void SseEvaluationRemove(string identifier)
+        {
+            _logger.LogInformation("SseEvaluationRemove");
+        }
+
+        public void SseEvaluationReload(List<Evaluation> evaluations)
+        {
+            _logger.LogInformation("SseEvaluationReload");
+        }
+    }
 
     public FfClient(string apiKey, FfConfig config, FfTarget target)
     {
@@ -55,6 +99,14 @@ public class FfClient : IDisposable
         }
 
         await PollOnce();
+
+        if (_config.StreamEnabled)
+        {
+            var listener = new StreamSourceListener(_config.LoggerFactory);
+            var streamUrl = _config.ConfigUrl + "/stream?cluster=" + _authInfo.ClusterIdentifier;
+            _eventSource = new EventSource(_authInfo, streamUrl, _config, listener, _config.LoggerFactory);
+            _eventSource.Start();
+        }
 
         _pollTimer.Enabled = true;
 
@@ -105,6 +157,14 @@ public class FfClient : IDisposable
     private void Poll(object sender, ElapsedEventArgs e)
     {
         _ = PollOnce();
+
+
+
+        if (_config.StreamEnabled && _streamFailed)
+        {
+            // TODO if the stream failed restart it here, or in eventsource itself
+        }
+
     }
 
     private async Task PollOnce()
@@ -207,6 +267,7 @@ public class FfClient : IDisposable
         _pollTimer.Stop();
         _pollTimer.Dispose();
         _metricsTimer?.Dispose();
+        _eventSource?.Dispose();
         _api?.Dispose();
     }
 

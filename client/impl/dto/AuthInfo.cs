@@ -1,4 +1,4 @@
-namespace ff_dotnet_wasm_client_sdk.client;
+namespace ff_dotnet_wasm_client_sdk.client.impl.dto;
 
 internal class AuthInfo
 {

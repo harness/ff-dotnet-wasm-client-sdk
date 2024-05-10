@@ -21,7 +21,7 @@ var loggerFactory = new SerilogLoggerFactory(
 var target = new FfTarget("dotNETwasm-getstarted", "dotNETwasm-getstarted",
     new Dictionary<string, string> { { "email", "person@myorg.com" }});
 
-var config = FfConfig.Builder().LoggerFactory(loggerFactory).Debug(true).Build();
+var config = FfConfig.Builder().LoggerFactory(loggerFactory).SetStreamEnabled(true).Debug(true).Build();
 
 using var client = new FfClient(apiKey, config, target);
 await client.InitializeAsync();

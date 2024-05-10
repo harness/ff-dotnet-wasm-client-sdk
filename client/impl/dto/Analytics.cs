@@ -1,8 +1,7 @@
-using System;
 using ff_dotnet_wasm_client_sdk.client.dto;
 using io.harness.ff_dotnet_client_sdk.openapi.Model;
 
-namespace io.harness.ff_dotnet_client_sdk.client.impl.dto
+namespace ff_dotnet_wasm_client_sdk.client.impl.dto
 {
     internal class Analytics : IEquatable<Analytics>
     {

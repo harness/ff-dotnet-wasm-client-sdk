@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{3E
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "getting-started", "examples\getting-started\getting-started.csproj", "{21DC0C3C-7E21-4CDD-ADC4-6DD84A2425D2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "blazor-wasm", "examples\blazor-wasm\blazor-wasm.csproj", "{BE7871A7-7B25-4A64-AA19-BE3F1C152878}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,8 +28,13 @@ Global
 		{21DC0C3C-7E21-4CDD-ADC4-6DD84A2425D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{21DC0C3C-7E21-4CDD-ADC4-6DD84A2425D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{21DC0C3C-7E21-4CDD-ADC4-6DD84A2425D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE7871A7-7B25-4A64-AA19-BE3F1C152878}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE7871A7-7B25-4A64-AA19-BE3F1C152878}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE7871A7-7B25-4A64-AA19-BE3F1C152878}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE7871A7-7B25-4A64-AA19-BE3F1C152878}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{21DC0C3C-7E21-4CDD-ADC4-6DD84A2425D2} = {3EDB1EC1-6733-4522-AC8F-58C677A91158}
+		{BE7871A7-7B25-4A64-AA19-BE3F1C152878} = {3EDB1EC1-6733-4522-AC8F-58C677A91158}
 	EndGlobalSection
 EndGlobal
