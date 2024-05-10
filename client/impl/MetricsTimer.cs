@@ -1,15 +1,13 @@
 using System.Collections.Concurrent;
-using System.Net.Http;
 using System.Timers;
 using ff_dotnet_wasm_client_sdk.client.dto;
-using ff_dotnet_wasm_client_sdk.client.impl;
 using io.harness.ff_dotnet_client_sdk.client.impl.dto;
 using io.harness.ff_dotnet_client_sdk.openapi.Api;
 using io.harness.ff_dotnet_client_sdk.openapi.Client;
 using io.harness.ff_dotnet_client_sdk.openapi.Model;
 using Microsoft.Extensions.Logging;
 
-namespace ff_dotnet_wasm_client_sdk.client;
+namespace ff_dotnet_wasm_client_sdk.client.impl;
 
 internal class MetricsTimer : IDisposable
 {
@@ -34,8 +32,6 @@ internal class MetricsTimer : IDisposable
     private int _evalCounter;
     private int _metricsEvaluationsDropped;
     private readonly ConfigBuilder.INetworkChecker _networkChecker = new ConfigBuilder.NullNetworkChecker();
-
-
 
     internal MetricsTimer(FfTarget target, FfConfig config, ILoggerFactory loggerFactory, AuthInfo? authInfo)
     {

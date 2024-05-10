@@ -1,13 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Timers;
 using ff_dotnet_wasm_client_sdk.client.dto;
 using ff_dotnet_wasm_client_sdk.client.impl;
 using io.harness.ff_dotnet_client_sdk.openapi.Api;
-using io.harness.ff_dotnet_client_sdk.openapi.Client;
 using io.harness.ff_dotnet_client_sdk.openapi.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -15,17 +13,11 @@ using Newtonsoft.Json.Linq;
 
 namespace ff_dotnet_wasm_client_sdk.client;
 
-// threads and blocking in Wasm are disallowed by the browser sandbox so this client SDK implements a version of
-// the SDK that uses Async methods only and no background threads. Cache is populated on demand when calling
-// one of the xVariation SDK entry point functions (e.g. boolVariation) but only if key is older than 60 seconds
-// (configurable via PollInterval) or it does not exist. Metrics are updated by a timer. It should be noted that this
-// design is different to regular SDKs that typically avoid network activity in the xVariation functions for speed.
-
 public class FfClient : IDisposable
 {
     internal static readonly string SdkVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
     internal static readonly string HarnessSdkInfoHeader = ".NETBlazorWasm " + SdkVersion + " Client";
-    internal static readonly string UserAgentHeader = ".NET/" + SdkVersion;
+    internal static readonly string UserAgentHeader = ".NETBlazorWasm/" + SdkVersion;
     internal const int DefaultTimeoutMs = 60_000;
 
     private readonly ILogger<FfClient> _logger;
@@ -176,7 +168,6 @@ public class FfClient : IDisposable
         return Task.FromResult(XVariation<JObject>(evaluationId, defaultValue, eval => JObject.Parse(eval.Value)));
     }
 
-
     private T XVariation<T>(string evaluationId, T defaultValue, Func<Evaluation, T> evalToPrimitive)
     {
         var defaultValueStr = defaultValue?.ToString() ?? "null";
@@ -202,83 +193,6 @@ public class FfClient : IDisposable
         return evalToPrimitive.Invoke(evaluation);
     }
 
-    public async Task<bool> BoolVariationAsync2(string evaluationId, bool defaultValue)
-    {
-        return await XVariationAsync2(evaluationId, defaultValue, eval => bool.Parse(eval.Value));
-    }
-
-    public async Task<string> StringVariationAsync2(string evaluationId, string defaultValue)
-    {
-        return await XVariationAsync2(evaluationId, defaultValue, eval => eval.Value);
-    }
-
-    public  async Task<double> NumberVariationAsync2(string evaluationId, double defaultValue)
-    {
-        return await XVariationAsync2(evaluationId, defaultValue, eval => double.Parse(eval.Value));
-    }
-
-    public  async Task<JObject> JsonVariationAsync2(string evaluationId, JObject defaultValue)
-    {
-        return await XVariationAsync2<JObject>(evaluationId, defaultValue, eval => JObject.Parse(eval.Value));
-    }
-
-    private async Task<T> XVariationAsync2<T>(string evaluationId, T defaultValue, Func<Evaluation, T> evalToPrimitive)
-    {
-        if (_authInfo == null) {
-            SdkCodes.WarnDefaultVariationServed(_logger, evaluationId, defaultValue?.ToString() ?? "null", "SDK not authenticated");
-            return defaultValue;
-        }
-
-        var key = MakeCacheKey(_authInfo.EnvironmentIdentifier, evaluationId);
-
-        try
-        {
-            var keyExists = _cache1.TryGetValue(key, out var cacheEntry);
-            var elapsed = keyExists ? (DateTime.Now - (cacheEntry?.LastUpdated ?? DateTime.Now)).Seconds : 0;
-
-            if (cacheEntry == null || elapsed >= 59)
-            {
-                if (_config.Debug)
-                    _logger.LogInformation("Key {CacheKey} not in cache or expired, query server for evaluation {EvaluationId}", key, evaluationId);
-
-                // flag not cached or cached entry out of date, refresh it from server
-                var evaluation = await _api.GetEvaluationByIdentifierAsync(_authInfo.Environment,
-                    evaluationId, _target.Identifier, _authInfo.ClusterIdentifier);
-
-                cacheEntry = new CacheEntry(true, 200, "ok", evaluation, DateTime.Now);
-                _cache1[key] = cacheEntry;
-            }
-
-            if (!cacheEntry.IsSuccess() || cacheEntry.Eval == null)
-            {
-                _logger.LogInformation($"Evaluation {evaluationId} found in cache with failed status {cacheEntry.StatusCode}:{cacheEntry.StatusMsg}");
-
-                SdkCodes.WarnDefaultVariationServed(_logger, evaluationId, defaultValue?.ToString() ?? "null",
-                    $"Evaluation returned status {cacheEntry.StatusCode}:{cacheEntry.StatusMsg} {elapsed} seconds ago");
-                return defaultValue;
-            }
-
-            _logger.LogInformation("Evaluation {EvaluationId} found in cache", evaluationId);
-
-            RegisterEvaluation(evaluationId, cacheEntry.Eval);
-            return evalToPrimitive.Invoke(cacheEntry.Eval);
-
-        }
-        catch (Exception ex)
-        {
-            var statusCode = 0;
-            if (ex is ApiException apiEx)
-                statusCode = apiEx.ErrorCode;
-
-            // If we get an exception on the given key then cache the key with the status code/error msg, so we don't repeatedly hit the BE
-            _cache1[key] = new CacheEntry(false, statusCode, ex.Message, null, DateTime.Now);
-
-            SdkCodes.WarnDefaultVariationServed(_logger, evaluationId, defaultValue?.ToString() ?? "null", ex.Message);
-            SdkCodes.LogUtils.LogException(_config, ex);
-            return defaultValue;
-        }
-    }
-
     private void RegisterEvaluation(string evaluationId, Evaluation evaluation)
     {
         if (_config?.AnalyticsEnabled ?? false)
@@ -296,12 +210,10 @@ public class FfClient : IDisposable
         _api?.Dispose();
     }
 
-
     private static string MakeCacheKey(string? environmentIdentifier, string flag)
     {
         return new StringBuilder().Append(environmentIdentifier).Append('_').Append(flag).ToString();
     }
-
 
     private ClientApi MakeClientApi()
     {
