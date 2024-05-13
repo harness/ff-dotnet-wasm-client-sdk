@@ -36,6 +36,7 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
         private readonly AuthInfo _authInfo;
         private const int ReadTimeoutMs = 60_000;
         private Task? _eventReceiverTask;
+        private bool _abortFlag;
 
         internal EventSource(AuthInfo authInfo, string url, FfConfig config, IEventSourceListener callback, ILoggerFactory loggerFactory)
         {
@@ -92,46 +93,62 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
 
         private async Task StreamEventReceiverTask()
         {
-            try
+            do
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(60_000));
-
-                cts.Token.Register(() => _logger.LogWarning("stream cancellation requested"));
-
-                using var req = new HttpRequestMessage(HttpMethod.Get, _url);
-                AddSdkHeaders(req.Headers, _authInfo);
-                req.SetBrowserResponseStreamingEnabled(true);
-                //req.SetBrowserRequestMode(BrowserRequestMode.Cors);
-
-                using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-                await using var stream = await resp.Content.ReadAsStreamAsync(cts.Token);
-
-                await _callback.SseStart();
-
-                while (!cts.Token.IsCancellationRequested)
+                try
                 {
-                    while (await ReadLineAsync(stream, cts) is { } message)
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(60_000));
+
+                    cts.Token.Register(() => _logger.LogWarning("stream cancellation requested"));
+
+                    using var req = new HttpRequestMessage(HttpMethod.Get, _url);
+                    AddSdkHeaders(req.Headers, _authInfo);
+                    req.SetBrowserResponseStreamingEnabled(true);
+                    //req.SetBrowserRequestMode(BrowserRequestMode.Cors);
+
+                    using var resp =
+                        await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                    await using var stream = await resp.Content.ReadAsStreamAsync(cts.Token);
+
+                    await _callback.SseStart();
+
+                    while (!cts.Token.IsCancellationRequested)
                     {
-                        if (!message.Contains("domain"))
+                        while (await ReadLineAsync(stream, cts) is { } message)
                         {
-                            _logger.LogTrace("Received event source heartbeat");
-                            continue;
+                            if (!message.Contains("domain"))
+                            {
+                                _logger.LogTrace("Received event source heartbeat");
+                                continue;
+                            }
+
+                            SdkCodes.InfoStreamEventReceived(_logger, message);
+
+                            var jsonMessage = JObject.Parse("{" + message + "}");
+                            await ProcessMessage(jsonMessage["data"]);
                         }
-
-                        SdkCodes.InfoStreamEventReceived(_logger, message);
-
-                        var jsonMessage = JObject.Parse("{" + message + "}");
-                        await ProcessMessage(jsonMessage["data"]);
                     }
-                }
-                await _callback.SseEnd("End of stream", null);
-            }
-            catch (Exception e)
-            {
-                SdkCodes.LogUtils.LogExceptionAndWarn(_logger, _config, "EventSource threw an error: " + e.Message, e);
-                await _callback.SseEnd(e.Message, e);
-            }
 
+                    await _callback.SseEnd("End of stream", null);
+                }
+                catch (Exception e)
+                {
+                    SdkCodes.LogUtils.LogExceptionAndWarn(_logger, _config, "EventSource threw an error: " + e.Message,
+                        e);
+                    await _callback.SseEnd(e.Message, e);
+                }
+
+                if (!_abortFlag)
+                {
+                    var delay = TimeSpan.FromMinutes(1);
+                    _logger.LogInformation("Will attempt to reconnect to stream endpoint in {Delay}ms",
+                        delay.TotalMilliseconds);
+                    await Task.Delay(delay);
+                }
+
+            } while (!_abortFlag);
+
+            _logger.LogInformation("EventSource is shutting down");
         }
 
         private async Task ProcessMessage(JToken? data)
@@ -170,6 +187,7 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
 
         public void Dispose()
         {
+            _abortFlag = true;
             _eventReceiverTask?.Wait();
             _eventReceiverTask?.Dispose();
             _httpClient.Dispose();

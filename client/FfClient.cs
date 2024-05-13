@@ -34,7 +34,6 @@ public class FfClient : IDisposable
     private AuthInfo? _authInfo;
     private MetricsTimer? _metricsTimer;
     private EventSource? _eventSource;
-    private bool _streamFailed;
 
     private class StreamSourceListener : IEventSourceListener
     {
@@ -189,14 +188,6 @@ public class FfClient : IDisposable
     private void Poll(object sender, ElapsedEventArgs e)
     {
         _ = PollOnce();
-
-
-
-        if (_config.StreamEnabled && _streamFailed)
-        {
-            // TODO if the stream failed restart it here, or in eventsource itself
-        }
-
     }
 
     private async Task PollOnce()
@@ -234,7 +225,7 @@ public class FfClient : IDisposable
     {
         var key = MakeCacheKey(environmentIdentifier, flag);
         _cache.AddOrUpdate(key, eval, (_, _) => eval);
-        _logger.LogInformation("Added key {CacheKey} to cache. New cache size: {CacheSize}", key, _cache.Count);
+        _logger.LogTrace("Added key {CacheKey} to cache. New cache size: {CacheSize}", key, _cache.Count);
     }
 
     private void RepoRemoveEvaluation(string authInfoEnvironmentIdentifier, string evaluationFlag)
