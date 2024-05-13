@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using ff_dotnet_wasm_client_sdk.client.impl.dto;
@@ -14,17 +12,17 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
     interface IEventSourceListener
     {
         /// SSE stream started ok
-        void SseStart();
+        Task SseStart();
         /// SSE stream ended, if stream ended because of an error then cause will be non-null
-        void SseEnd(string reason, Exception? cause);
+        Task SseEnd(string reason, Exception? cause);
         /// Indicates callback to server required to get flag state
-        void SseEvaluationChange(string identifier);
+        Task SseEvaluationChange(string identifier);
         /// Event includes evaluations payload, cache can be updated immediately with no callback
-        void SseEvaluationsUpdate(List<Evaluation> evaluations);
+        Task SseEvaluationsUpdate(List<Evaluation> evaluations);
         /// Indicates flag removal
-        void SseEvaluationRemove(string identifier);
+        Task SseEvaluationRemove(string identifier);
         /// Indicates creation, change or removal of a target group we want to reload evaluations
-        void SseEvaluationReload(List<Evaluation> evaluations);
+        Task SseEvaluationReload(List<Evaluation> evaluations);
 
     }
 
@@ -108,7 +106,7 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
                 using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
                 await using var stream = await resp.Content.ReadAsStreamAsync(cts.Token);
 
-                _callback.SseStart();
+                await _callback.SseStart();
 
                 while (!cts.Token.IsCancellationRequested)
                 {
@@ -123,20 +121,20 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
                         SdkCodes.InfoStreamEventReceived(_logger, message);
 
                         var jsonMessage = JObject.Parse("{" + message + "}");
-                        ProcessMessage(jsonMessage["data"]);
+                        await ProcessMessage(jsonMessage["data"]);
                     }
                 }
-                _callback.SseEnd("End of stream", null);
+                await _callback.SseEnd("End of stream", null);
             }
             catch (Exception e)
             {
                 SdkCodes.LogUtils.LogExceptionAndWarn(_logger, _config, "EventSource threw an error: " + e.Message, e);
-                _callback.SseEnd(e.Message, e);
+                await _callback.SseEnd(e.Message, e);
             }
 
         }
 
-        private void ProcessMessage(JToken? data)
+        private async Task ProcessMessage(JToken? data)
         {
             if (data == null)
             {
@@ -152,7 +150,7 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
                 // On creation, change or removal of a target group we want to reload evaluations
                 if ("delete".Equals(eventType) || "patch".Equals(eventType) || "Equals".Equals(eventType))
                 {
-                    _callback.SseEvaluationReload(new List<Evaluation>());
+                    await _callback.SseEvaluationReload(new List<Evaluation>());
                 }
             }
             else if ("flag".Equals(domain))
@@ -160,12 +158,12 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
                 // On creation or change of a flag we want to send a change event
                 if ("create".Equals(eventType) || "patch".Equals(eventType))
                 {
-                    _callback.SseEvaluationChange(identifier);
+                    await _callback.SseEvaluationChange(identifier);
                 }
                 // On deletion of a flag we want to send a remove event
                 else if ("delete".Equals(eventType))
                 {
-                    _callback.SseEvaluationRemove(identifier);
+                    await _callback.SseEvaluationRemove(identifier);
                 }
             }
         }

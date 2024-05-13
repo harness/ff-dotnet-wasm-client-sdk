@@ -11,6 +11,7 @@ using io.harness.ff_dotnet_client_sdk.openapi.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
+using LogUtils = ff_dotnet_wasm_client_sdk.client.impl.SdkCodes.LogUtils;
 
 namespace ff_dotnet_wasm_client_sdk.client;
 
@@ -37,42 +38,73 @@ public class FfClient : IDisposable
 
     private class StreamSourceListener : IEventSourceListener
     {
-        private ILogger<StreamSourceListener> _logger;
+        private readonly ILogger<StreamSourceListener> _logger;
+        private readonly FfConfig _config;
+        private readonly FfClient _ffClient;
+        private readonly AuthInfo _authInfo;
+        private readonly ClientApi _api;
+        private readonly FfTarget _target;
 
-
-        internal StreamSourceListener(ILoggerFactory factory)
+        internal StreamSourceListener(FfClient ffClient, ClientApi api, AuthInfo authInfo, FfTarget target, FfConfig config)
         {
-            _logger = factory.CreateLogger<StreamSourceListener>();
+            _logger = config.LoggerFactory.CreateLogger<StreamSourceListener>();
+            _ffClient = ffClient;
+            _api = api;
+            _authInfo = authInfo;
+            _target = target;
+            _config = config;
         }
 
-        public void SseStart()
+        public async Task SseStart()
         {
-            _logger.LogInformation("SseStart");
+            await _ffClient.PollOnce();
+            SdkCodes.InfoStreamConnected(_logger);
         }
 
-        public void SseEnd(string reason, Exception? cause)
+        public async Task SseEnd(string reason, Exception? cause)
         {
-            _logger.LogInformation("SseEnd");
+            SdkCodes.InfoStreamStopped(_logger, reason);
+            if (cause != null)
+            {
+                LogUtils.LogExceptionAndWarn(_logger, _config, "Stream end exception", cause);
+            }
+
+            await _ffClient.PollOnce();
         }
 
-        public void SseEvaluationChange(string identifier)
+        public async Task SseEvaluationChange(string identifier)
         {
-            _logger.LogInformation("SseEvaluationChange");
+            _logger.LogTrace("SSE Evaluation {identifier} changed, fetching flag from server",identifier);
+
+            Evaluation evaluation = await _api.GetEvaluationByIdentifierAsync(_authInfo.Environment,
+                identifier, _target.Identifier, _authInfo.ClusterIdentifier);
+
+            _ffClient.RepoSetEvaluation(_authInfo.EnvironmentIdentifier, evaluation.Flag, evaluation);
         }
 
-        public void SseEvaluationsUpdate(List<Evaluation> evaluations)
+        public Task SseEvaluationsUpdate(List<Evaluation> evaluations)
         {
-            _logger.LogInformation("SseEvaluationsUpdate");
+            _logger.LogTrace("SSE update {Count} evaluations from event", evaluations.Count);
+
+            foreach (var evaluation in evaluations)
+            {
+                _ffClient.RepoSetEvaluation(_authInfo.EnvironmentIdentifier, evaluation.Flag, evaluation);
+            }
+
+            return Task.CompletedTask;
         }
 
-        public void SseEvaluationRemove(string identifier)
+        public Task SseEvaluationRemove(string identifier)
         {
-            _logger.LogInformation("SseEvaluationRemove");
+            _logger.LogTrace("SSE Evaluation remove {Identifier}", identifier);
+            _ffClient.RepoRemoveEvaluation(_authInfo.EnvironmentIdentifier, identifier);
+            return Task.CompletedTask;
         }
 
-        public void SseEvaluationReload(List<Evaluation> evaluations)
+        public Task SseEvaluationReload(List<Evaluation> evaluations)
         {
             _logger.LogInformation("SseEvaluationReload");
+            return Task.CompletedTask;
         }
     }
 
@@ -102,7 +134,7 @@ public class FfClient : IDisposable
 
         if (_config.StreamEnabled)
         {
-            var listener = new StreamSourceListener(_config.LoggerFactory);
+            var listener = new StreamSourceListener(this, _api, _authInfo, _target, _config);
             var streamUrl = _config.ConfigUrl + "/stream?cluster=" + _authInfo.ClusterIdentifier;
             _eventSource = new EventSource(_authInfo, streamUrl, _config, listener, _config.LoggerFactory);
             _eventSource.Start();
@@ -194,7 +226,7 @@ public class FfClient : IDisposable
         }
         catch (Exception ex)
         {
-            SdkCodes.LogUtils.LogException(_config, ex);
+            LogUtils.LogException(_config, ex);
         }
     }
 
@@ -202,7 +234,14 @@ public class FfClient : IDisposable
     {
         var key = MakeCacheKey(environmentIdentifier, flag);
         _cache.AddOrUpdate(key, eval, (_, _) => eval);
-        _logger.LogTrace("Added key {CacheKey} to cache. New cache size: {CacheSize}", key, _cache.Count);
+        _logger.LogInformation("Added key {CacheKey} to cache. New cache size: {CacheSize}", key, _cache.Count);
+    }
+
+    private void RepoRemoveEvaluation(string authInfoEnvironmentIdentifier, string evaluationFlag)
+    {
+        var key = MakeCacheKey(authInfoEnvironmentIdentifier, evaluationFlag);
+        _cache.TryRemove(key, out _);
+        _logger.LogTrace("Removed key {CacheKey} from cache. New cache size: {CacheSize}", key, _cache.Count);
     }
 
     /* note that the xVariationAsync aren't truly async and just return immediately,
@@ -243,7 +282,7 @@ public class FfClient : IDisposable
 
         if (evaluation == null || string.IsNullOrEmpty(evaluation.Value))
         {
-            failureReason.Append(evaluationId).Append(" not in cache");
+            failureReason.Append(key).Append(" not in cache");
             SdkCodes.WarnDefaultVariationServed(_logger, evaluationId, defaultValueStr, failureReason.ToString());
             return defaultValue;
         }
