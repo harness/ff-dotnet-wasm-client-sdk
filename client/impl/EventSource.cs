@@ -97,7 +97,7 @@ namespace ff_dotnet_wasm_client_sdk.client.impl
             {
                 try
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(60_000));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromHours(23));
 
                     cts.Token.Register(() => _logger.LogWarning("stream cancellation requested"));
 
