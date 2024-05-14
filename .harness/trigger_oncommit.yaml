@@ -1,0 +1,19 @@
+inputSet:
+  name: oncommit
+  identifier: oncommit
+  orgIdentifier: Feature_Flag
+  projectIdentifier: FFPipelines
+  pipeline:
+    identifier: ffdotnetwasmclientsdk
+    variables:
+      - name: release
+        type: String
+        default: "false"
+        value: "false"
+    properties:
+      ci:
+        codebase:
+          build:
+            type: branch
+            spec:
+              branch: <+trigger.branch>
