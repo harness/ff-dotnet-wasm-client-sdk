@@ -1,0 +1,75 @@
+﻿@page "/counter"
+@using System.Timers
+@using Timer = System.Threading.Timer
+
+@inject IFeatureFlagsContext FlagContext;
+
+<PageTitle>Feature Flags SDK</PageTitle>
+
+<h1>Feature Flags SDK in a WebAssembly sandbox</h1>
+<button class="btn btn-primary" @onclick="Reset">Reset output</button>
+<p style="padding: 15px;">
+<pre role="status">@_output</pre>
+</p>
+
+
+
+
+@code {
+    private int _counter = 0;
+    private string _output = "";
+    private Timer _timer;
+
+    private void Reset()
+    {
+        _output = "";
+        _counter = 0;
+        InvokeAsync(() => { StateHasChanged(); });
+    }
+
+    private async void OnTimedEvent(object? source)
+    {
+        try
+        {
+            _counter++;
+
+            if (FlagContext.IsAuthenticated())
+            {
+                var flagid = "harnessappdemodarkmode";
+                var boolResult = await FlagContext.GetBoolFlagAsync(flagid);
+                PrintLine($"{_counter} - bool flag {flagid} is {boolResult}");
+            }
+            else
+            {
+                if (FlagContext.IsSdkKeyValid())
+                {
+                    PrintLine($"{_counter} - SDK not yet authenticated, please wait...");
+                }
+                else
+                {
+                    PrintLine($"{_counter} - Please set a client SDK key in FeatureFlagsContext.cs");
+                    await _timer.DisposeAsync();
+                }
+            }
+
+            InvokeAsync(() => { StateHasChanged(); });
+        }
+        catch (Exception ex)
+        {
+            PrintLine("EXCEPTION CAUGHT:\n\n" + ex.ToString());
+            InvokeAsync(() => { StateHasChanged(); });
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _timer = new Timer(OnTimedEvent, null, 0, 2_000);
+    }
+
+    private void PrintLine(string line)
+    {
+        _output += line + "\n";
+        InvokeAsync(() => { StateHasChanged(); });
+    }
+
+}
