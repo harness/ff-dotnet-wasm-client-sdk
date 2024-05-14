@@ -17,9 +17,11 @@ public class FfConfig
     public int MetricsCapacity { get; }
     public bool Debug { get; }
 
+    public INetworkChecker NetworkChecker { get; }
+
     public ILoggerFactory LoggerFactory { get; }
 
-    internal FfConfig(string configUrl, string eventUrl, int pollIntervalInSeconds, int metricsIntervalInSeconds, bool streamEnabled, bool analyticsEnabled, int metricsCapacity, bool debug, ILoggerFactory loggerFactory)
+    internal FfConfig(string configUrl, string eventUrl, int pollIntervalInSeconds, int metricsIntervalInSeconds, bool streamEnabled, bool analyticsEnabled, int metricsCapacity, bool debug, ILoggerFactory loggerFactory, INetworkChecker networkChecker)
     {
         ConfigUrl = configUrl;
         EventUrl = eventUrl;
@@ -30,6 +32,7 @@ public class FfConfig
         MetricsCapacity = metricsCapacity;
         Debug = debug;
         LoggerFactory = loggerFactory;
+        NetworkChecker = networkChecker;
     }
 
     public static ConfigBuilder Builder()
@@ -51,10 +54,11 @@ public class ConfigBuilder
     private int _metricsCapacity = DefaultMetricsCapacity;
     private bool _debug = false;
     private ILoggerFactory _loggerFactory = new NullLoggerFactory();
+    private INetworkChecker _networkChecker = new NullNetworkChecker();
 
     public FfConfig Build()
     {
-        return new FfConfig(_configUrl, _eventUrl, _pollIntervalInSeconds, _metricsIntervalInSeconds, _streamEnabled, _analyticsEnabled, _metricsCapacity, _debug, _loggerFactory);
+        return new FfConfig(_configUrl, _eventUrl, _pollIntervalInSeconds, _metricsIntervalInSeconds, _streamEnabled, _analyticsEnabled, _metricsCapacity, _debug, _loggerFactory, _networkChecker);
     }
 
     public ConfigBuilder SetPollingInterval(int pollIntervalInSeconds)
@@ -99,29 +103,48 @@ public class ConfigBuilder
         return this;
     }
 
+    /**
+     * <summary>
+     * Enables stack trace logging and enables certain INFO level logs that would generally be considered
+     * too noisy/repetitive for logs (e.g. polling)
+     * </summary>
+     */
     public ConfigBuilder Debug(bool debug)
     {
         _debug = debug;
         return this;
     }
 
+    /**
+     * <summary>
+     * Provide a callback for detecting if network is available. If the callback returns false, the SDK will not attempt
+     * to poll, stream or post metrics or do any other network activity. If you don't set this, then the default
+     * implementation will always return true, if your app needs to detect network being offline you should provide
+     * an implementation to prevent the SDK logging network errors/exceptions.
+     * </summary>
+     */
+    public ConfigBuilder NetworkChecker(INetworkChecker networkChecker)
+    {
+        _networkChecker = networkChecker;
+        return this;
+    }
 
     public ConfigBuilder LoggerFactory(ILoggerFactory factory)
     {
         _loggerFactory = factory;
         return this;
     }
+}
 
-    public interface INetworkChecker
+public interface INetworkChecker
+{
+    bool IsNetworkAvailable();
+}
+
+internal class NullNetworkChecker : INetworkChecker
+{
+    public bool IsNetworkAvailable()
     {
-        bool IsNetworkAvailable();
+        return true;
     }
-
-    internal class NullNetworkChecker : INetworkChecker {
-        public bool IsNetworkAvailable()
-        {
-            return true;
-        }
-    }
-
 }

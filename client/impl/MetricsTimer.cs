@@ -31,7 +31,7 @@ internal class MetricsTimer : IDisposable
     private readonly AuthInfo _authInfo;
     private int _evalCounter;
     private int _metricsEvaluationsDropped;
-    private readonly ConfigBuilder.INetworkChecker _networkChecker = new ConfigBuilder.NullNetworkChecker();
+    private readonly INetworkChecker _networkChecker = new NullNetworkChecker();
 
     internal MetricsTimer(FfTarget target, FfConfig config, ILoggerFactory loggerFactory, AuthInfo? authInfo)
     {
@@ -60,6 +60,12 @@ internal class MetricsTimer : IDisposable
     {
         if (_config.Debug)
             _logger.LogInformation("Posting metrics");
+
+        if (!_config.NetworkChecker.IsNetworkAvailable())
+        {
+            _logger.LogInformation("Network offline, skipping metrics post");
+            return;
+        }
 
         try
         {

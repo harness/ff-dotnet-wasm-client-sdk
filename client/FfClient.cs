@@ -122,7 +122,21 @@ public class FfClient : IDisposable
     public async Task InitializeAsync()
     {
         _api = MakeClientApi();
-        _authInfo = await AuthenticateAsync(_apiKey, _config, _target);
+        var authenticated = false;
+        do
+        {
+            try
+            {
+                _authInfo = await AuthenticateAsync(_apiKey, _config, _target);
+                authenticated = true;
+            }
+            catch (Exception ex)
+            {
+                LogUtils.LogExceptionAndWarn(_logger,_config, "Authentication failed and will be retried in 30 seconds", ex);
+                await Task.Delay(30_000);
+            }
+        } while (!authenticated);
+
 
         if (_config.AnalyticsEnabled)
         {
@@ -176,7 +190,6 @@ public class FfClient : IDisposable
         _api.Configuration.DefaultHeaders.Clear();
         AddSdkHeaders(_api.Configuration.DefaultHeaders, authInfo);
 
-
         return authInfo;
     }
 
@@ -194,6 +207,12 @@ public class FfClient : IDisposable
     {
         if (_config.Debug)
             _logger.LogInformation("Polling for flags");
+
+        if (!_config.NetworkChecker.IsNetworkAvailable())
+        {
+            _logger.LogInformation("Network offline, polling skipped");
+            return;
+        }
 
         if (_authInfo == null)
         {

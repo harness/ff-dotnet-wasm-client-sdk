@@ -38,7 +38,7 @@ internal static class SdkCodes
     internal static void InfoStreamEventReceived(ILogger logger, string eventJson)
     {
         if (logger.IsEnabled(LogLevel.Information))
-            logger.LogInformation("SDKCODE(auth:5002): SSE event received:: {EventJson}", eventJson);
+            logger.LogInformation("SDKCODE(auth:5002): SSE event received: {EventJson}", eventJson);
     }
 
     internal static void WarnDefaultVariationServed(ILogger logger, string evaluationId, string defaultValue, string reason)
@@ -75,7 +75,7 @@ internal static class SdkCodes
     {
         internal static void LogExceptionAndWarn(ILogger logger, FfConfig config, string message, Exception exception)
         {
-            logger.LogWarning("{Message}:{ExceptionMessage}", message, exception.Message);
+            logger.LogWarning("{Message}: {ExceptionMessage}", message, exception.Message);
 
             if (config.Debug)
             {
@@ -85,7 +85,7 @@ internal static class SdkCodes
 
         internal static void LogExceptionAndInfo(ILogger logger, FfConfig config, string message, Exception exception)
         {
-            logger.LogInformation("{Message}:{ExceptionMessage}", message, exception.Message);
+            logger.LogInformation("{Message}: {ExceptionMessage}", message, exception.Message);
 
             if (config.Debug)
             {
