@@ -1,5 +1,5 @@
 # ff-dotnet-wasm-client-sdk
-FF .NET client SDK for Blazor WebAssembly
+FF .NET client SDK for [Blazor WebAssembly](https://dotnet.microsoft.com/en-us/apps/aspnet/web-apps/blazor)
 
 # Intro
 Use this README to get started with our Feature Flags (FF) Client SDK for .NET. This guide outlines the basics of getting started with the SDK and provides a full code sample for you to try out. This sample doesn’t include configuration options, for in depth steps and configuring the SDK, for example, disabling streaming or using our Relay Proxy, see the .NET SDK Reference.
@@ -66,6 +66,14 @@ The `dotnet watch` command will open up a browser:
 ```bash
 cd examples/blazor-wasm
 dotnet watch
+```
+
+Also, a small command line version has been provided. This runs from the console. To see full browser integration checkout the [Blazor WASM example](examples/blazor-wasm)
+
+```bash
+cd examples/getting-started
+export FF_API_KEY=<your key here>
+dotnet run
 ```
 
 
