@@ -122,21 +122,8 @@ public class FfClient : IDisposable
     public async Task InitializeAsync()
     {
         _api = MakeClientApi();
-        var authenticated = false;
-        do
-        {
-            try
-            {
-                _authInfo = await AuthenticateAsync(_apiKey, _config, _target);
-                authenticated = true;
-            }
-            catch (Exception ex)
-            {
-                LogUtils.LogExceptionAndWarn(_logger,_config, "Authentication failed and will be retried in 30 seconds", ex);
-                await Task.Delay(30_000);
-            }
-        } while (!authenticated);
 
+        await Authenticate();
 
         if (_config.AnalyticsEnabled)
         {
@@ -156,6 +143,35 @@ public class FfClient : IDisposable
         _pollTimer.Enabled = true;
 
         SdkCodes.InfoSdkAuthOk(_logger, SdkVersion);
+    }
+
+    private async Task Authenticate()
+    {
+        var authenticated = false;
+        do
+        {
+            if (_config.NetworkChecker.IsNetworkAvailable())
+            {
+                try
+                {
+                    _authInfo = await AuthenticateAsync(_apiKey, _config, _target);
+                    authenticated = true;
+                }
+                catch (Exception ex)
+                {
+                    LogUtils.LogExceptionAndWarn(_logger, _config,
+                        "Authentication failed and will be retried in 30 seconds", ex);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("Network offline, authentication will be retried in 30 seconds");
+            }
+
+            if (!authenticated)
+                await Task.Delay(30_000);
+
+        } while (!authenticated);
     }
 
     private async Task<AuthInfo> AuthenticateAsync(string apiKey, FfConfig config, FfTarget target)
