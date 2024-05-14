@@ -14,7 +14,7 @@ internal static class SdkCodes
     internal static void ErrorMissingSdkKey(ILogger logger)
     {
         if (logger.IsEnabled(LogLevel.Error))
-            logger.LogError("SDKCODE(auth:1002): Missing or empty API key");
+            logger.LogError("SDKCODE(init:1002): Missing or empty API key");
     }
 
     internal static void InfoSdkAuthOk(ILogger logger, string sdkVersion)
@@ -26,19 +26,19 @@ internal static class SdkCodes
     internal static void InfoStreamConnected(ILogger logger)
     {
         if (logger.IsEnabled(LogLevel.Information))
-            logger.LogInformation("SDKCODE(auth:5000): SSE stream connected ok");
+            logger.LogInformation("SDKCODE(stream:5000): SSE stream connected ok");
     }
 
     internal static void InfoStreamStopped(ILogger logger, string reason)
     {
         if (logger.IsEnabled(LogLevel.Information))
-            logger.LogInformation("SDKCODE(auth:5001): SSE stream disconnected, reason: {Reason}", reason);
+            logger.LogInformation("SDKCODE(stream:5001): SSE stream disconnected, reason: {Reason}", reason);
     }
 
     internal static void InfoStreamEventReceived(ILogger logger, string eventJson)
     {
         if (logger.IsEnabled(LogLevel.Information))
-            logger.LogInformation("SDKCODE(auth:5002): SSE event received: {EventJson}", eventJson);
+            logger.LogInformation("SDKCODE(stream:5002): SSE event received: {EventJson}", eventJson);
     }
 
     internal static void WarnDefaultVariationServed(ILogger logger, string evaluationId, string defaultValue, string reason)
