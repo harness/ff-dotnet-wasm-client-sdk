@@ -1,0 +1,19 @@
+inputSet:
+  name: OnRelease
+  identifier: OnRelease
+  orgIdentifier: Feature_Flag
+  projectIdentifier: FFPipelines
+  pipeline:
+    identifier: ffdotnetwasmclientsdk
+    variables:
+      - name: release
+        type: String
+        default: "false"
+        value: "false"
+    properties:
+      ci:
+        codebase:
+          build:
+            type: tag
+            spec:
+              tag: <+eventPayload.release.tag_name>
