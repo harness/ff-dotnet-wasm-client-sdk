@@ -1,0 +1,207 @@
+---
+pipeline:
+  allowStageExecutions: true
+  projectIdentifier: "FFPipelines"
+  orgIdentifier: "Feature_Flag"
+  tags:
+    SDK: ""
+  stages:
+  - stage:
+      name: "Build"
+      identifier: "Build"
+      type: "CI"
+      spec:
+        cloneCodebase: true
+        infrastructure:
+          type: "KubernetesDirect"
+          spec:
+            connectorRef: "ffplayci"
+            namespace: "default"
+            automountServiceAccountToken: true
+            nodeSelector: {}
+            os: "Linux"
+        execution:
+          steps:
+          - step:
+              type: "Run"
+              name: "Build"
+              identifier: "Build"
+              spec:
+                connectorRef: "DockerHub"
+                image: "mcr.microsoft.com/dotnet/sdk:7.0"
+                shell: "Sh"
+                command: "./build.sh\n"
+                reports:
+                  type: "JUnit"
+                  spec:
+                    paths:
+                    - "tests/ff-client-sdk-test/junit.xml"
+                imagePullPolicy: "IfNotPresent"
+                resources:
+                  limits:
+                    memory: "8G"
+                    cpu: "4000m"
+          - step:
+              type: "Run"
+              name: "CVE scan"
+              identifier: "CVE_scan"
+              spec:
+                connectorRef: "platform205701"
+                image: "us.gcr.io/platform-205701/ff-sdk-sto-scanner:latest"
+                shell: "Bash"
+                command: "/run.sh\nfind .\ncat output_dotnet.json\n"
+                envVariables:
+                  CONTAINER_PATH_TO_SCAN: "."
+                imagePullPolicy: "Always"
+          - parallel:
+            - step:
+                type: "AquaTrivy"
+                name: "AquaTrivy ingest"
+                identifier: "AquaTrivy_ingest"
+                spec:
+                  mode: "ingestion"
+                  config: "default"
+                  target:
+                    type: "container"
+                    name: "AquaTrivy"
+                    variant: "main"
+                  advanced:
+                    log:
+                      level: "info"
+                    fail_on_severity: "medium"
+                  privileged: false
+                  ingestion:
+                    file: "./output_trivy.json"
+            - step:
+                type: "Owasp"
+                name: "Owasp injest"
+                identifier: "Owasp_injest"
+                spec:
+                  mode: "ingestion"
+                  config: "default"
+                  target:
+                    type: "repository"
+                    name: "OWASP"
+                    variant: "main"
+                  advanced:
+                    log:
+                      level: "info"
+                    fail_on_severity: "medium"
+                  ingestion:
+                    file: "./output_owasp.json"
+          - step:
+              type: "Run"
+              name: "Generate Test coverage"
+              identifier: "Generate_Test_coverage"
+              spec:
+                connectorRef: "DockerHub"
+                image: "mcr.microsoft.com/dotnet/sdk:7.0"
+                shell: "Sh"
+                command: "echo \"Running Test Coverage\"\ndotnet test tests/ff-client-sdk-test/ff-client-sdk-test.csproj\
+                  \ /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura\nls\
+                  \ -l tests/ff-client-sdk-test/\necho \"Done\"\necho \"Create HTML\
+                  \ Test Coverage\"\ndotnet tool restore\ndotnet tool run reportgenerator\
+                  \ -reports:./tests/ff-client-sdk-test/coverage.net7.0.cobertura.xml\
+                  \ -targetdir:coverage\necho \"done\""
+                resources:
+                  limits:
+                    memory: "2G"
+                    cpu: "1000m"
+              when:
+                stageStatus: "Success"
+                condition: "false"
+          - parallel:
+            - step:
+                type: "Run"
+                name: "Publish"
+                identifier: "Publish"
+                spec:
+                  connectorRef: "DockerHub"
+                  image: "mcr.microsoft.com/dotnet/sdk:8.0"
+                  shell: "Sh"
+                  command: "dotnet workload install maui\ndotnet pack\ndotnet nuget\
+                    \ push /harness/bin/Debug/ff-dotnet-client-sdk.<+eventPayload.release.tag_name>.nupkg\
+                    \ --api-key <+pipeline.variables.nuget_token> --source https://api.nuget.org/v3/index.json"
+                when:
+                  stageStatus: "Success"
+                  condition: "<+pipeline.variables.release>"
+            - step:
+                type: "GCSUpload"
+                name: "Upload Test Coverage"
+                identifier: "Upload_Test_Coverage"
+                spec:
+                  connectorRef: "platform205701"
+                  bucket: "ff-test-coverage"
+                  sourcePath: "coverage"
+                  target: "ff-dotnet-sdk/"
+                when:
+                  stageStatus: "Success"
+                  condition: "false"
+        sharedPaths:
+        - "/root/.dotnet/tools/"
+        - "/var/run"
+        caching:
+          enabled: false
+          paths: []
+        slsa_provenance:
+          enabled: false
+      when:
+        pipelineStatus: "Success"
+  - stage:
+      name: "Publish Release Notes"
+      identifier: "Publish_Release_Notes"
+      description: ""
+      type: "Approval"
+      spec:
+        execution:
+          steps:
+          - step:
+              name: "Jira Create"
+              identifier: "Jira_Create"
+              template:
+                templateRef: "ffsdkreleasenotestemplate"
+                versionLabel: "1"
+        serviceDependencies: []
+      tags: {}
+      when:
+        pipelineStatus: "Success"
+        condition: "<+pipeline.variables.release>"
+  variables:
+  - name: "github_token"
+    type: "Secret"
+    value: "davejohnstonffserver"
+  - name: "nuget_token"
+    type: "Secret"
+    value: "dotnet_nuget_token"
+  - name: "release"
+    type: "String"
+    default: "false"
+    value: "<+input>.allowedValues(true,false)"
+  - name: "GCR_KEY_B64"
+    type: "Secret"
+    description: ""
+    value: "Platform_GCR_KEY_b64"
+  - name: "SONAR_TOKEN"
+    type: "Secret"
+    description: ""
+    value: "FF_SONARQUBE_TOKEN"
+  notificationRules:
+  - name: "FailedPipeline"
+    identifier: "FailedPipeline"
+    pipelineEvents:
+    - type: "PipelineFailed"
+    notificationMethod:
+      type: "Slack"
+      spec:
+        userGroups: []
+        webhookUrl: "<+variable.FF_SDK_BUILDS_SLACK_URL>"
+    enabled: true
+  properties:
+    ci:
+      codebase:
+        connectorRef: "ffsdks"
+        repoName: "ff-dotnet-client-sdk"
+        build: "<+input>"
+  identifier: "ffdotnetwasmclientsdk"
+  description: "The Feature Flag ff-dotnet-client-sdk CI build"
+  name: "ff-dotnet-wasm-client-sdk"
