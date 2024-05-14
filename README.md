@@ -22,11 +22,11 @@ Server SDKs are designed for server environments, since potentially sensitive ru
 This repository. This is a client SDK - it is designed to run client-side inside the web browser's WebAssembly Virtual Machine.
 It imports some wasm specific modules for streaming support.
 
-## ff-dotnet-client-client-sdk
+## ff-dotnet-client-sdk
 
 This is a generic .NET C# client SDK designed for desktop and mobule apps via MAUI. See the [Github repository](https://github.com/harness/ff-dotnet-client-sdk)
 
-## ff-dotnet-server-client-sdk
+## ff-dotnet-server-sdk
 
 Our server side .NET C# server SDK, designed for server environments. See the [Github repository](https://github.com/harness/ff-dotnet-server-sdk)
 
