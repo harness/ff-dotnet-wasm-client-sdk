@@ -8,11 +8,11 @@
     <RootNamespace>ff_dotnet_wasm_client_sdk</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.1.0</Version>
-    <PackageVersion>0.1.0</PackageVersion>
-    <AssemblyVersion>0.1.0</AssemblyVersion>
+    <Version>0.1.1</Version>
+    <PackageVersion>0.1.1</PackageVersion>
+    <AssemblyVersion>0.1.1</AssemblyVersion>
     <Authors>support@harness.io</Authors>
-    <Copyright>Copyright © 2024</Copyright>
+    <Copyright>Copyright © 2025</Copyright>
     <PackageIconUrl>https://harness.io/icon-ff.svg</PackageIconUrl>
     <PackageLicenseUrl>https://github.com/harness/ff-dotnet-wasm-client-sdk/blob/main/LICENSE</PackageLicenseUrl>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
